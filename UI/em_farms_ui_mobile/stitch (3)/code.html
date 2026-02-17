@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Customer Directory - Egg Sales CRM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13e71a",
+                        "background-light": "#f6f8f6",
+                        "background-dark": "#102211",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark text-[#0d1b0e] dark:text-slate-100 min-h-screen">
+<!-- Top Navigation Bar -->
+<nav class="sticky top-0 z-30 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+<div class="flex items-center p-4 justify-between max-w-md mx-auto">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#0d1b0e] dark:text-slate-100">menu</span>
+</div>
+<h1 class="text-lg font-bold leading-tight tracking-tight flex-1 text-center">Customer Directory</h1>
+<div class="flex items-center justify-end">
+<button class="p-2">
+<span class="material-symbols-outlined text-[#0d1b0e] dark:text-slate-100">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Search Bar Section -->
+<div class="px-4 pb-3 max-w-md mx-auto">
+<label class="flex flex-col w-full">
+<div class="flex w-full items-stretch rounded-xl h-10 bg-gray-200/50 dark:bg-white/10">
+<div class="flex items-center justify-center pl-3">
+<span class="material-symbols-outlined text-gray-500 dark:text-gray-400 text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:outline-0 focus:ring-0 h-full placeholder:text-gray-500 text-sm font-normal px-2" placeholder="Search customers by name..." type="text"/>
+</div>
+</label>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="max-w-md mx-auto pb-24">
+<!-- Customer Card 1 -->
+<div class="p-4 @container">
+<div class="flex flex-col items-stretch justify-start rounded-xl overflow-hidden shadow-sm bg-white dark:bg-[#1a2e1b] border border-gray-100 dark:border-gray-800">
+<div class="w-full h-32 bg-center bg-no-repeat bg-cover" data-alt="Modern bakery storefront with warm lighting" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDbAw4wib3DQVwb0mr1xhuBmuLlj3SysMUIiCfHW_L1_DvlYBdoDt_GkDqDopdwvcxtH3maguT1_-LK6sQI4orTaWL0KzCXa17Nf8EUiVt8lIFySCKuqZ8SDVxoVx78nTDa7-jBhbpXjKd2VwEFaDZciQS-B--ElSf8npArSecSSON9y2YvIDJiTr94Y3t6a2JV17_7YQhARW4ZUIs0dR1wG70q0AW_-DnjLAmaBGoz4btW6yeF-EJ2u0IRl1WmnHf6J8oD_BZcoQ");'>
+</div>
+<div class="flex w-full flex-col p-4 gap-2">
+<div class="flex justify-between items-start">
+<p class="text-[#0d1b0e] dark:text-white text-lg font-bold">Main Street Bakery</p>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Premium</span>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>+1 (555) 123-4567</span>
+</div>
+<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+<span class="material-symbols-outlined text-[16px]">history</span>
+<span>Last purchase: Oct 24, 2023</span>
+</div>
+</div>
+<div class="mt-2 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Lifetime Crates</p>
+<p class="text-primary font-bold text-base">450 Crates</p>
+</div>
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Total Spent</p>
+<p class="text-primary font-bold text-base">$2,250.00</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Customer Card 2 -->
+<div class="p-4 @container pt-0">
+<div class="flex flex-col items-stretch justify-start rounded-xl overflow-hidden shadow-sm bg-white dark:bg-[#1a2e1b] border border-gray-100 dark:border-gray-800">
+<div class="w-full h-32 bg-center bg-no-repeat bg-cover" data-alt="Interior of a cozy local cafe" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZX-f2CRYBwWlzZsu4uuLJS8TykZx38wJLUkkuv_g0kanPFBA8g4Z5VkYmrmRpzw6QqSxCjFVDOHE4Y1hdEKe-xPE-VSgnlouWhoNjGslc2J1P8f0EQexkYB-grlUwyCRAkSf8Krs0x7v88ZyYD8hreTQkCZINWn5zqJYHswvqLEr6qCAlfU2CI47-U9kFJlvXRQLPVw1GvsTIEJFzaugcQTiNvnPuMqP0tMuzh76Nm8dWgrTIGi4oeL-cxAtHWDtDF3qX9xBQeQ");'>
+</div>
+<div class="flex w-full flex-col p-4 gap-2">
+<div class="flex justify-between items-start">
+<p class="text-[#0d1b0e] dark:text-white text-lg font-bold">Sunny Side Cafe</p>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>+1 (555) 987-6543</span>
+</div>
+<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+<span class="material-symbols-outlined text-[16px]">history</span>
+<span>Last purchase: Oct 22, 2023</span>
+</div>
+</div>
+<div class="mt-2 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Lifetime Crates</p>
+<p class="text-primary font-bold text-base">210 Crates</p>
+</div>
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Total Spent</p>
+<p class="text-primary font-bold text-base">$1,050.00</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Customer Card 3 -->
+<div class="p-4 @container pt-0">
+<div class="flex flex-col items-stretch justify-start rounded-xl overflow-hidden shadow-sm bg-white dark:bg-[#1a2e1b] border border-gray-100 dark:border-gray-800">
+<div class="w-full h-32 bg-center bg-no-repeat bg-cover" data-alt="Organic grocery store vegetable aisle" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDw9E_sjdr7wpuUqTnefDMwoo57h88ewQUKeMWYcLNzQouVRDTACOSzebkL82_nyg5JBZ8D2Dm-5mRJxNj1kjwwLEbgQ1blUQ-b-y2GpCV52KPpfPSx2MdKvc5Rt68z8VJUDYsTvmeRG5NsRdUoj_DsonKpDYNaZyRWxDDhM-R0qOFn96AMmEqqLKuXnUztqIIoNQJYQSJOcICie8W60JEaEUO2HU6wA9D_cGf1FcgSL0fE3XFsX2J1c3OZ5x_B0bPhir3Jhq0MzQ");'>
+</div>
+<div class="flex w-full flex-col p-4 gap-2">
+<div class="flex justify-between items-start">
+<p class="text-[#0d1b0e] dark:text-white text-lg font-bold">Organic Grocer Co.</p>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Wholesale</span>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>+1 (555) 000-1111</span>
+</div>
+<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+<span class="material-symbols-outlined text-[16px]">history</span>
+<span>Last purchase: Oct 15, 2023</span>
+</div>
+</div>
+<div class="mt-2 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Lifetime Crates</p>
+<p class="text-primary font-bold text-base">1,200 Crates</p>
+</div>
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Total Spent</p>
+<p class="text-primary font-bold text-base">$6,000.00</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Customer Card 4 -->
+<div class="p-4 @container pt-0">
+<div class="flex flex-col items-stretch justify-start rounded-xl overflow-hidden shadow-sm bg-white dark:bg-[#1a2e1b] border border-gray-100 dark:border-gray-800">
+<div class="w-full h-32 bg-center bg-no-repeat bg-cover" data-alt="Country breakfast restaurant exterior" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDiir5-OqNYmu_vrlbDSWeueBbC1LCWxp8Cudm4A-0Sn2Yx6dNBwmVlaUMzmeqpOoECH8veKZVxYtuQDDzRSmRxrq2DFQlyorgUMnFMA5QgKEP283s4pbfDEj8t0dU1H6XuMHRN1RZDG7FS13cpFaR_ZJRyOsORGtZKW2GehGbl40EDD3OqqywoJq8AtRTgFgEWN4KPaZXFy_1M1Hb1VjpU7FasFQ_0ZS_0sftYgbJuqJ4qBT9-tu4BHbPiSjScw66CxqLOhgOB8Q");'>
+</div>
+<div class="flex w-full flex-col p-4 gap-2">
+<div class="flex justify-between items-start">
+<p class="text-[#0d1b0e] dark:text-white text-lg font-bold">The Omelette Bar</p>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>+1 (555) 333-4444</span>
+</div>
+<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs">
+<span class="material-symbols-outlined text-[16px]">history</span>
+<span>Last purchase: Nov 01, 2023</span>
+</div>
+</div>
+<div class="mt-2 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Lifetime Crates</p>
+<p class="text-primary font-bold text-base">85 Crates</p>
+</div>
+<div>
+<p class="text-xs text-gray-500 dark:text-gray-500 uppercase font-semibold">Total Spent</p>
+<p class="text-primary font-bold text-base">$425.00</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-6 right-6 flex items-center justify-center size-14 bg-primary text-white rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined text-[32px]">add</span>
+</button>
+<!-- iOS Tab Bar (Bottom) -->
+<div class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 px-6 py-2 pb-6 flex justify-between items-center z-40 max-w-md mx-auto">
+<div class="flex flex-col items-center gap-1 opacity-50 dark:opacity-40">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px]">Home</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[10px]">Customers</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50 dark:opacity-40">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="text-[10px]">Orders</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50 dark:opacity-40">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-[10px]">Stats</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50 dark:opacity-40">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px]">Settings</span>
+</div>
+</div>
+</body></html>
