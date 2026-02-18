@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"dir /b \"\"C:\\\\Users\\\\bened\\\\OneDrive\\\\Documents\\\\PFMS\\\\pfms\\\\UI\\\\em_farms_ui_mobile\"\" 2>&1\")",
+      "Bash(cmd /c:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(py:*)",
+      "Bash(where:*)",
+      "Bash(dir:*)"
+    ]
+  }
+}

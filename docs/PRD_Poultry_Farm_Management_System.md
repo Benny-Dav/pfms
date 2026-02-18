@@ -2,10 +2,11 @@
 
 | Field | Detail |
 |-------|--------|
-| **Document Version** | 2.0 |
+| **Document Version** | 2.1 |
 | **Status** | Draft |
 | **Author** | Benedicta Davour |
-| **Date** | February 11, 2026 |
+| **Date** | February 17, 2026 |
+| **Change Summary** | v2.1: Applied client MVP decisions — offline sales conflict model, crate definition distinction, payment methods & credit sales, edit rules & audit trail, production session field, inventory movement log, offline security scope, and dual profit metrics (Operational + Cash) |
 | **Default Currency** | GHS (Ghanaian Cedi - GH₵) — configurable per tenant |
 
 ---
@@ -206,9 +207,11 @@ Daily egg production is the core data entry operation. Each record ties to a spe
 | FR-203 | All production records must be stored historically | P0 | Never deleted, audit trail |
 | FR-204 | View egg production per flock (filterable) | P0 | Table view with date, count |
 | FR-205 | View egg production over time (table and/or chart) | P0 | Line chart recommended |
-| FR-206 | Production records cannot be edited once finalized | P1 | Soft lock — optional for MVP, warn user |
+| FR-206 | Production records are editable within 10 minutes of creation; after that, only a Tenant Admin can edit, or a correction entry must be used | P0 | See Section 4.16 for edit rules and correction entry |
 | FR-207 | Validate: eggs laid must be a positive integer | P0 | Input validation |
 | FR-208 | Validate: date cannot be in the future | P0 | Default to today |
+| FR-209 | Optional session field on each production record: AM / PM / Other | P0 | Supports farms that collect eggs multiple times per day |
+| FR-210 | If a record exists for the same flock + same date, warn the user but allow saving | P0 | Multiple sessions per day are valid; warning shown, not blocked |
 
 **Business Rules:**
 
@@ -259,33 +262,40 @@ Record and track egg sales. Sales are recorded in crates and automatically reduc
 
 | ID | Requirement | Priority | Notes |
 |----|-------------|----------|-------|
-| FR-501 | Record sale with: date, customer, number of crates sold, price per crate | P0 | |
-| FR-502 | Auto-calculate total sale amount (crates x price per crate) | P0 | Display in GH₵ |
+| FR-501 | Record sale with: date, customer, number of crates sold, price per crate, amount paid, payment method, and optional payment reference/notes | P0 | |
+| FR-502 | Auto-calculate total sale amount (crates x price per crate) and balance (total amount − amount paid) | P0 | Display in GH₵ |
 | FR-503 | Sales must reduce egg stock automatically (crates x 30 eggs) | P0 | Triggered on save |
-| FR-504 | Sales must update customer totals automatically | P0 | Total crates, total spent, last purchase date |
+| FR-504 | Sales must update customer totals automatically | P0 | Total crates, total revenue, total paid, outstanding balance, last purchase date |
 | FR-505 | Prevent sale if insufficient egg stock exists | P0 | Validate: crates x 30 <= eggs on hand |
 | FR-506 | Sales quantities are recorded in crates only (not individual eggs) | P0 | UX: only crate input |
-| FR-507 | View sales history with date filtering | P0 | Table with date, customer, crates, amount |
-| FR-508 | View sales summary for date range | P1 | Total crates sold, total revenue |
+| FR-507 | Payment method must be one of: Cash, MoMo, Bank, Credit | P0 | Required field; Credit means amount_paid = 0 or partial |
+| FR-508 | Credit sales are allowed: amount_paid may be less than total_amount | P0 | Balance = total_amount − amount_paid; balance tracked per sale |
+| FR-509 | View sales history with date filtering | P0 | Table with date, customer, crates, total, paid, balance, method |
+| FR-510 | View sales summary for date range | P1 | Total crates sold, gross revenue, cash collected, outstanding credit |
+| FR-511 | Sales records are editable within 10 minutes of creation; after that, only Admin can edit or a correction entry must be used | P0 | See Section 4.16 for edit rules |
 
 **Business Rules:**
 
 - System must prevent sales if insufficient egg stock exists
 - Sales quantities are recorded in crates only (1 crate = 30 eggs)
-- Total sale amount = Number of crates x Price per crate
+- total_amount = crates_sold × price_per_crate
+- balance = total_amount − amount_paid
+- Credit sales are allowed; balance may be positive
+- Payment method is required on every sale record
 
 ### 4.6 Inventory Management
 
-Track all physical inventory used on the farm beyond eggs.
+Track all physical inventory used on the farm beyond eggs. The system uses a **hybrid model**: `quantity_on_hand` is stored on the item for fast display, and every change to inventory creates a corresponding **Inventory Movement** log entry for full traceability.
 
 | ID | Requirement | Priority | Notes |
 |----|-------------|----------|-------|
-| FR-601 | Track inventory for: Feed, Medicines, Egg crates, Empty egg crates, Other farm items | P1 | Configurable item types |
-| FR-602 | Display current quantity on hand for each item | P1 | |
-| FR-603 | Increase inventory when items are purchased | P1 | Linked to purchase records |
-| FR-604 | Decrease inventory when items are used or consumed | P1 | Manual usage entry |
-| FR-605 | Allow manual stock adjustments with reason | P1 | Reason required for audit |
+| FR-601 | Track inventory for: Feed, Medicines, Egg crates (empty/physical), Other farm items | P1 | Configurable item types; Empty Crates is distinct from derived sellable crates |
+| FR-602 | Display current quantity on hand for each item | P1 | Stored value on item; updated on every movement |
+| FR-603 | Increase inventory when items are purchased; create a movement log entry (type: purchase) | P1 | Linked to purchase record |
+| FR-604 | Decrease inventory when items are used or consumed; create a movement log entry (type: usage) | P1 | Manual usage entry |
+| FR-605 | Allow manual stock adjustments with a required reason; create a movement log entry (type: adjustment) | P1 | Reason required; stored on movement log |
 | FR-606 | View inventory list with current quantities | P1 | |
+| FR-607 | View inventory movement history per item (full log of all changes) | P1 | Filterable by date and type |
 
 ### 4.7 Purchases
 
@@ -306,29 +316,41 @@ Record all farm expenses for financial tracking and profit calculation.
 |----|-------------|----------|-------|
 | FR-801 | Record expense with: date, category, description, amount (GH₵) | P0 | |
 | FR-802 | Optional flock link on expense record | P1 | For flock-level cost analysis |
-| FR-803 | Expense categories: Salaries, Feed, Medication, Utilities, Maintenance, Transport, Miscellaneous | P0 | Pre-defined list |
+| FR-803 | Expense categories are grouped into two types: **Operating Expenses** (Salaries, Utilities, Transport, Maintenance, Miscellaneous) and **Production Costs** (Feed, Medication). Each expense must be assigned a category within one of these groups | P0 | Pre-defined list; grouping used in financial reports |
 | FR-804 | View expense list with date and category filtering | P0 | |
 | FR-805 | View expense summary by category for date range | P1 | Breakdown chart/table |
 | FR-806 | Edit and delete expense records | P0 | With confirmation dialog |
 
 ### 4.9 Profit & Reporting
 
-Provide financial visibility and profitability tracking. Uses cash-based accounting.
+Provide financial visibility and profitability tracking. The system tracks both accrual revenue (total sales value including credit) and cash received, enabling two distinct profit views.
 
 | ID | Requirement | Priority | Notes |
 |----|-------------|----------|-------|
-| FR-901 | Display total sales revenue for selected period (GH₵) | P0 | Sum of all sales |
-| FR-902 | Display total expenses for selected period (GH₵) | P0 | Sum of all expenses |
-| FR-903 | Display net profit: Total Sales - Total Expenses | P0 | Cash-based accounting |
-| FR-904 | Filter by date range (custom start/end dates) | P0 | Date picker UI |
-| FR-905 | Filter by flock (optional) | P1 | Only shows expenses linked to flock + proportional sales |
-| FR-906 | Display profit trend over time (chart) | P1 | Monthly bar/line chart |
+| FR-901 | Display **Gross Revenue** for selected period: total sales value including credit (GH₵) | P0 | Sum of all sale total_amount |
+| FR-902 | Display **Cash Collected** for selected period: money actually received (GH₵) | P0 | Sum of all sale amount_paid |
+| FR-903 | Display **Outstanding Credit** for selected period: unpaid balances (GH₵) | P0 | Sum of all sale balance |
+| FR-904 | Display **Total Expenses** for selected period, split by group (GH₵) | P0 | Operating Expenses subtotal + Production Costs subtotal |
+| FR-905 | Display **Operational Profit**: Gross Revenue − Total Expenses | P0 | Business performance view |
+| FR-906 | Display **Cash Profit**: Cash Collected − Total Expenses | P0 | Cash-in-hand view — what the owner actually feels |
+| FR-907 | Both profit metrics displayed together on the Profit Summary screen | P0 | Side-by-side or stacked cards with clear labels |
+| FR-908 | Filter by date range (custom start/end dates) with presets: This Week, This Month, Last Month, Custom | P0 | Date picker UI |
+| FR-909 | Filter by farm (specific farm or all farms aggregated) | P0 | Cross-farm view sums revenue and expenses |
+| FR-910 | Filter by flock (optional) | P1 | Only shows expenses linked to flock + proportional sales |
+| FR-911 | Display expense breakdown by category group (Operating vs Production) for selected period | P0 | Table or chart |
+| FR-912 | Display profit trend over time (chart) | P1 | Monthly bar/line chart; show both profit types |
 
 **Business Rules:**
 
-- Net Profit = Total Sales Revenue - Total Expenses
-- System uses cash-based accounting (revenue/expenses recorded when money changes hands)
-- All monetary values displayed in GH₵ (Ghanaian Cedi)
+- Gross Revenue = SUM(sale.total_amount) — total value of all sales including credit
+- Cash Collected = SUM(sale.amount_paid) — money actually received
+- Outstanding Credit = SUM(sale.balance) — unpaid portion of credit sales
+- Operational Profit = Gross Revenue − Total Expenses (business performance indicator)
+- Cash Profit = Cash Collected − Total Expenses (cash-in-hand indicator)
+- Both profit metrics must be available and clearly labelled on all financial reports
+- Operating Expenses: Salaries, Utilities, Transport, Maintenance, Miscellaneous
+- Production Costs: Feed, Medication
+- All monetary values displayed in the tenant's configured currency (default: GH₵)
 
 ### 4.10 Custom User Roles & Permissions
 
@@ -458,7 +480,7 @@ The system must function as a Progressive Web App (PWA) that allows core data en
 | FR-1404 | Offline entries are queued and sync automatically when connectivity returns | P0 | Background sync via Service Worker |
 | FR-1405 | Visual indicator showing online/offline status | P0 | Persistent banner or icon in header |
 | FR-1406 | Visual indicator showing number of pending (unsynced) entries | P0 | Badge count on sync icon |
-| FR-1407 | Conflict resolution: server data wins for stock calculations; user is notified of any conflicts | P0 | Last-write-wins with notification of discrepancies |
+| FR-1407 | Conflict resolution: if an offline sale or entry causes negative stock upon sync, it is flagged for Admin Review — it is NOT silently deleted or rejected. Server recalculates stock from source records and surfaces conflicts to the Admin for resolution | P0 | Flag-and-review model; never silent failure or automatic deletion |
 | FR-1408 | Dashboard displays cached data when offline with "Last synced: X minutes ago" indicator | P0 | Read from IndexedDB cache |
 | FR-1409 | User can manually trigger a sync when online | P1 | "Sync Now" button in settings or header |
 | FR-1410 | App shell (navigation, empty forms) loads instantly from cache even on slow connections | P0 | Service worker caching strategy |
@@ -470,7 +492,57 @@ The system must function as a Progressive Web App (PWA) that allows core data en
 - Stock validation offline uses last-synced stock level; a warning is shown: "Stock data may be outdated (last synced X minutes ago)"
 - If an offline sale would result in negative stock once synced, the system flags it for admin review rather than rejecting it retroactively
 - Sync happens automatically in the background; manual sync is also available
-- Offline data is encrypted at rest in IndexedDB
+- Offline data is stored locally and protected via app authentication and device security. Advanced offline encryption is planned for a future version.
+
+### 4.16 Edit Rules, Correction Entries & Audit Trail
+
+All transactional records (egg production, sales, expenses, purchases, inventory adjustments) follow a consistent edit policy to balance operational flexibility with data integrity.
+
+#### Edit Window Policy
+
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-1601 | Any user may edit their own record within 10 minutes of creation | P0 | Time window calculated from created_at |
+| FR-1602 | After 10 minutes, only a Tenant Admin can edit a record directly | P0 | Enforced on both client and API |
+| FR-1603 | Non-admin users who need to correct a record after 10 minutes must use a Correction Entry | P0 | Original record is preserved; correction is linked |
+| FR-1604 | Soft deletes only — no records are permanently deleted. Deleted records store deleted_by and delete_reason | P0 | delete_reason is required; shown in audit log |
+| FR-1605 | Deleting a sale after 10 minutes requires Admin permission | P0 | Same 10-minute policy applies |
+
+#### Correction Entry
+
+| ID | Requirement | Priority | Notes |
+|----|-------------|----------|-------|
+| FR-1606 | A Correction Entry is a new record that references the original record's ID | P0 | Stores original_record_id and correction_reason |
+| FR-1607 | The correction record contains the correct values; the original record is preserved unchanged | P0 | Both records visible in audit log |
+| FR-1608 | The system calculates derived values (stock, profit) using both the original and correction records | P0 | Net effect is applied; no double-counting |
+| FR-1609 | Users can view the correction history for any record | P1 | Shown in record detail view |
+
+#### Audit Trail
+
+Every transactional record must store the following fields:
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| created_by | UUID (FK) | Yes | User who created the record |
+| created_at | Timestamp | Yes | Auto-generated |
+| updated_by | UUID (FK) | No | Last user who edited the record; null if never edited |
+| updated_at | Timestamp | No | Timestamp of last edit; null if never edited |
+| deleted_by | UUID (FK) | No | User who soft-deleted the record; null if active |
+| deleted_at | Timestamp | No | When the record was soft-deleted; null if active |
+| delete_reason | String | No | Required when deleted_by is set |
+| is_deleted | Boolean | Yes | Default false; true when soft-deleted |
+
+These fields apply to: EggProduction, Sale, Expense, Purchase, InventoryItem, InventoryMovement.
+
+**Business Rules:**
+
+- No record is ever permanently deleted from the database
+- Deleted records are excluded from all calculations and list views unless Admin views the audit log
+- The 10-minute edit window is calculated server-side to prevent client-side manipulation
+- All edits by Admin after the edit window must include an edit reason (stored in updated notes or audit log)
+- Correction entries are linked to the original via original_record_id; the system treats them as a pair
+
+---
 
 ### 4.15 Tenant / Organization Management
 
@@ -518,7 +590,7 @@ The system must support isolated multi-tenant operations where each organization
 | Offline | NFR-18 | Core data entry works without internet connectivity | P0 |
 | Offline | NFR-19 | Offline data syncs within 30 seconds of connectivity restoration | P0 |
 | Offline | NFR-20 | App shell loads from cache in under 1 second even on offline/slow connections | P0 |
-| Offline | NFR-21 | Offline data encrypted at rest in IndexedDB | P0 |
+| Offline | NFR-21 | Offline data is stored locally and protected via app authentication and HTTPS. Advanced offline encryption (IndexedDB at-rest) is planned for a future version. | P1 |
 | Accessibility | NFR-22 | Minimum contrast ratio of 4.5:1 for text | P1 |
 | Accessibility | NFR-23 | Keyboard navigable for desktop use | P1 |
 
@@ -554,11 +626,20 @@ The dashboard is the landing screen and must provide immediate operational aware
 
 **Dashboard Cards:**
 
-- **Eggs on Hand:** Total eggs on hand (with crate equivalent)
-- **Crates Available:** Full crates available for sale
+- **Eggs on Hand:** Total eggs on hand for the selected farm
+- **Sellable Crates:** Derived — floor(eggs_on_hand / 30). This is NOT physical inventory; it represents how many full crates could be packed from current egg stock
+- **Empty Crates (Physical):** Physical egg trays available for packing — tracked as an inventory item, separate from the derived sellable crate count
 - **Recent Egg Production:** Last 7 days of egg production (mini table or chart)
-- **Recent Sales:** Last 5 sales transactions
-- **Profit Snapshot:** Current month revenue, expenses, and net profit
+- **Recent Sales:** Last 5 sales transactions (showing total, amount paid, and balance where applicable)
+- **Financial Snapshot (current month):**
+  - Gross Revenue (total sales value)
+  - Cash Collected (money received)
+  - Outstanding Credit (unpaid balances)
+  - Total Expenses
+  - Operational Profit (Gross Revenue − Expenses)
+  - Cash Profit (Cash Collected − Expenses)
+
+> **Note:** "Sellable Crates" and "Empty Crates (Physical)" are two distinct concepts and must be clearly labelled differently everywhere in the UI to avoid confusion.
 
 ### 6.3 Key User Flows
 
@@ -671,9 +752,18 @@ The dashboard is the landing screen and must provide immediate operational aware
 | flock_id | UUID (FK) | Yes | References Flock |
 | date | Date | Yes | Production date |
 | eggs_count | Integer | Yes | Number of eggs laid; must be >= 0 |
+| session | Enum | No | AM / PM / Other — optional; supports multiple collections per day |
+| original_record_id | UUID (FK) | No | Set if this is a Correction Entry linked to an original record |
+| correction_reason | String | No | Required when original_record_id is set |
 | created_by | UUID (FK) | Yes | References User who recorded the entry |
-| synced_at | Timestamp | No | When this record was synced from offline; null if created online |
 | created_at | Timestamp | Yes | Auto-generated |
+| updated_by | UUID (FK) | No | Last User who edited; null if never edited |
+| updated_at | Timestamp | No | Timestamp of last edit; null if never edited |
+| deleted_by | UUID (FK) | No | User who soft-deleted; null if active |
+| deleted_at | Timestamp | No | When soft-deleted; null if active |
+| delete_reason | String | No | Required when deleted_by is set |
+| is_deleted | Boolean | Yes | Default false |
+| synced_at | Timestamp | No | When this record was synced from offline; null if created online |
 
 **Customer**
 
@@ -698,10 +788,22 @@ The dashboard is the landing screen and must provide immediate operational aware
 | date | Date | Yes | Sale date |
 | crates_sold | Integer | Yes | Number of crates; must be > 0 |
 | price_per_crate | Decimal | Yes | Price per crate in tenant currency |
-| total_amount | Decimal | Yes | Auto-calculated: crates x price |
+| total_amount | Decimal | Yes | Auto-calculated: crates_sold × price_per_crate |
+| amount_paid | Decimal | Yes | Amount received at time of sale; may be 0 for full credit |
+| balance | Decimal | Yes | Auto-calculated: total_amount − amount_paid |
+| payment_method | Enum | Yes | Cash / MoMo / Bank / Credit |
+| payment_reference | String | No | Optional reference (e.g., MoMo transaction ID, cheque number) |
+| original_record_id | UUID (FK) | No | Set if this is a Correction Entry linked to an original sale |
+| correction_reason | String | No | Required when original_record_id is set |
 | created_by | UUID (FK) | Yes | References User who recorded the sale |
-| synced_at | Timestamp | No | When synced from offline; null if created online |
 | created_at | Timestamp | Yes | Auto-generated |
+| updated_by | UUID (FK) | No | Last User who edited; null if never edited |
+| updated_at | Timestamp | No | Timestamp of last edit; null if never edited |
+| deleted_by | UUID (FK) | No | User who soft-deleted; null if active |
+| deleted_at | Timestamp | No | When soft-deleted; null if active |
+| delete_reason | String | No | Required when deleted_by is set |
+| is_deleted | Boolean | Yes | Default false |
+| synced_at | Timestamp | No | When synced from offline; null if created online |
 
 **Expense**
 
@@ -711,13 +813,20 @@ The dashboard is the landing screen and must provide immediate operational aware
 | tenant_id | UUID (FK) | Yes | References Tenant |
 | farm_id | UUID (FK) | Yes | References Farm |
 | date | Date | Yes | Expense date |
-| category | Enum | Yes | Salaries, Feed, Medication, Utilities, Maintenance, Transport, Miscellaneous |
+| category | Enum | Yes | Operating: Salaries, Utilities, Transport, Maintenance, Miscellaneous; Production: Feed, Medication |
+| category_group | Enum | Yes | Operating or Production — derived from category |
 | description | String | Yes | Expense description |
 | amount | Decimal | Yes | Amount in tenant currency; must be > 0 |
 | flock_id | UUID (FK) | No | Optional link to flock |
 | created_by | UUID (FK) | Yes | References User who recorded the expense |
-| synced_at | Timestamp | No | When synced from offline; null if created online |
 | created_at | Timestamp | Yes | Auto-generated |
+| updated_by | UUID (FK) | No | Last User who edited; null if never edited |
+| updated_at | Timestamp | No | Timestamp of last edit; null if never edited |
+| deleted_by | UUID (FK) | No | User who soft-deleted; null if active |
+| deleted_at | Timestamp | No | When soft-deleted; null if active |
+| delete_reason | String | No | Required when deleted_by is set |
+| is_deleted | Boolean | Yes | Default false |
+| synced_at | Timestamp | No | When synced from offline; null if created online |
 
 **Inventory Item**
 
@@ -726,11 +835,27 @@ The dashboard is the landing screen and must provide immediate operational aware
 | id | UUID | Yes | Primary key |
 | tenant_id | UUID (FK) | Yes | References Tenant |
 | farm_id | UUID (FK) | Yes | References Farm |
-| name | String | Yes | Item name (Feed, Medicine, etc.) |
-| category | Enum | Yes | Feed, Medicines, Egg Crates, Other |
-| quantity_on_hand | Decimal | Yes | Current stock level |
+| name | String | Yes | Item name (Feed, Medicine, Empty Crates, etc.) |
+| category | Enum | Yes | Feed, Medicines, Empty Crates, Other |
+| quantity_on_hand | Decimal | Yes | Current stock level; updated on every movement for performance |
 | unit | String | Yes | Unit of measure (bags, bottles, pieces) |
+| low_stock_threshold | Decimal | No | Alert when quantity falls below this level |
 | updated_at | Timestamp | Yes | Auto-updated |
+
+**Inventory Movement** *(movement log — one entry per stock change)*
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| id | UUID | Yes | Primary key |
+| tenant_id | UUID (FK) | Yes | References Tenant |
+| farm_id | UUID (FK) | Yes | References Farm |
+| item_id | UUID (FK) | Yes | References Inventory Item |
+| type | Enum | Yes | purchase / usage / adjustment |
+| quantity_change | Decimal | Yes | Positive = stock in, Negative = stock out |
+| reason | String | No | Required when type = adjustment |
+| reference_id | UUID | No | References the triggering Purchase record (if type = purchase) |
+| created_by | UUID (FK) | Yes | References User who made the change |
+| created_at | Timestamp | Yes | Auto-generated |
 
 **User**
 
@@ -808,23 +933,41 @@ The dashboard is the landing screen and must provide immediate operational aware
 | quantity | Decimal | Yes | Quantity purchased |
 | total_cost | Decimal | Yes | Total cost in tenant currency |
 | created_by | UUID (FK) | Yes | References User who recorded the purchase |
-| synced_at | Timestamp | No | When synced from offline; null if created online |
 | created_at | Timestamp | Yes | Auto-generated |
+| updated_by | UUID (FK) | No | Last User who edited; null if never edited |
+| updated_at | Timestamp | No | Timestamp of last edit; null if never edited |
+| deleted_by | UUID (FK) | No | User who soft-deleted; null if active |
+| deleted_at | Timestamp | No | When soft-deleted; null if active |
+| delete_reason | String | No | Required when deleted_by is set |
+| is_deleted | Boolean | Yes | Default false |
+| synced_at | Timestamp | No | When synced from offline; null if created online |
 
 ### 7.2 Derived Data (Not Stored, Calculated)
 
-All derived calculations are scoped by `tenant_id` and `farm_id` unless explicitly cross-farm.
+All derived calculations are scoped by `tenant_id` and `farm_id` unless explicitly cross-farm. Soft-deleted records (`is_deleted = true`) are excluded from all calculations.
 
 | Metric | Calculation | Scope | Source Tables |
 |--------|-------------|-------|---------------|
-| Total eggs on hand (per farm) | SUM(egg_production.eggs_count) - SUM(sale.crates_sold x 30) WHERE farm_id = X | Farm | egg_production, sale |
-| Full crates available | FLOOR(eggs_on_hand / 30) | Farm | Derived from eggs on hand |
+| Total eggs on hand (per farm) | SUM(egg_production.eggs_count) − SUM(sale.crates_sold × 30) WHERE farm_id = X | Farm | egg_production, sale |
+| Sellable crates (per farm) | FLOOR(eggs_on_hand / 30) | Farm | Derived from eggs on hand |
 | Loose eggs | eggs_on_hand MOD 30 | Farm | Derived from eggs on hand |
 | Customer total crates | SUM(sale.crates_sold) WHERE customer_id = X | Tenant | sale |
-| Customer total spent | SUM(sale.total_amount) WHERE customer_id = X | Tenant | sale |
+| Customer total revenue | SUM(sale.total_amount) WHERE customer_id = X | Tenant | sale |
+| Customer total paid | SUM(sale.amount_paid) WHERE customer_id = X | Tenant | sale |
+| Customer outstanding credit | SUM(sale.balance) WHERE customer_id = X | Tenant | sale |
 | Customer last purchase | MAX(sale.date) WHERE customer_id = X | Tenant | sale |
-| Net profit (period, per farm) | SUM(sales) - SUM(expenses) for date range WHERE farm_id = X | Farm | sale, expense |
-| Net profit (period, all farms) | SUM(sales) - SUM(expenses) for date range WHERE tenant_id = X | Tenant | sale, expense |
+| Gross Revenue (period, per farm) | SUM(sale.total_amount) for date range WHERE farm_id = X | Farm | sale |
+| Cash Collected (period, per farm) | SUM(sale.amount_paid) for date range WHERE farm_id = X | Farm | sale |
+| Outstanding Credit (period, per farm) | SUM(sale.balance) for date range WHERE farm_id = X | Farm | sale |
+| Total Expenses (period, per farm) | SUM(expense.amount) for date range WHERE farm_id = X | Farm | expense |
+| Operating Expenses (period) | SUM(expense.amount) WHERE category_group = 'Operating' for date range | Farm | expense |
+| Production Costs (period) | SUM(expense.amount) WHERE category_group = 'Production' for date range | Farm | expense |
+| Operational Profit (period, per farm) | Gross Revenue − Total Expenses | Farm | sale, expense |
+| Cash Profit (period, per farm) | Cash Collected − Total Expenses | Farm | sale, expense |
+| Gross Revenue (period, all farms) | SUM(sale.total_amount) for date range WHERE tenant_id = X | Tenant | sale |
+| Cash Collected (period, all farms) | SUM(sale.amount_paid) for date range WHERE tenant_id = X | Tenant | sale |
+| Operational Profit (period, all farms) | Gross Revenue (all farms) − Total Expenses (all farms) | Tenant | sale, expense |
+| Cash Profit (period, all farms) | Cash Collected (all farms) − Total Expenses (all farms) | Tenant | sale, expense |
 
 ---
 
@@ -995,7 +1138,16 @@ All of the following must be true before launch:
 | Farm | A physical farm location within a tenant; each farm has independent stock, production, and financials |
 | Custom Role | A named set of permissions defined by the Tenant Admin, assigned to users |
 | Permission | A granular access right (e.g., "sales:create", "reports:view") assigned to custom roles |
+| Sellable Crates | Derived value — floor(eggs_on_hand / 30). Represents how many full crates could be packed; NOT physical inventory |
+| Empty Crates (Physical) | Physical egg trays tracked as an inventory item; distinct from derived sellable crates |
 | Crate | A standard egg crate containing 30 eggs |
+| Gross Revenue | Total value of all sales including credit (sum of total_amount) |
+| Cash Collected | Money actually received (sum of amount_paid) |
+| Outstanding Credit | Unpaid portion of credit sales (sum of balance) |
+| Operational Profit | Gross Revenue − Total Expenses (business performance view) |
+| Cash Profit | Cash Collected − Total Expenses (cash-in-hand view) |
+| Correction Entry | A new record linked to an original record used to adjust values without rewriting history |
+| Inventory Movement | A log entry recording every change to inventory stock (purchase, usage, or adjustment) |
 | Flock | A group of birds managed together within a farm, typically by age or batch |
 | Derived value | A value calculated from source records, not stored or manually edited |
 | Cash-based accounting | Revenue and expenses are recorded when money is received or paid, not when earned or incurred |

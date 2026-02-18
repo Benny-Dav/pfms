@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_DIRECT")
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+
+enum Session {
+  AM
+  PM
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  MOMO
+  BANK
+  CREDIT
+}
+
+enum ExpenseCategory {
+  SALARIES
+  FEED
+  MEDICATION
+  UTILITIES
+  MAINTENANCE
+  TRANSPORT
+  MISCELLANEOUS
+}
+
+enum CategoryGroup {
+  OPERATING
+  PRODUCTION
+}
+
+enum InventoryCategory {
+  FEED
+  MEDICINES
+  EMPTY_CRATES
+  OTHER
+}
+
+enum MovementType {
+  PURCHASE
+  USAGE
+  ADJUSTMENT
+}
+
+enum NotificationType {
+  LOW_EGG_STOCK
+  LOW_INVENTORY
+  PRODUCTION_REMINDER
+  WEEKLY_SUMMARY
+}
+
+enum InviteStatus {
+  PENDING
+  ACTIVE
+  DEACTIVATED
+}
+
+// ─────────────────────────────────────────
+// Tenant (Organisation)
+// ─────────────────────────────────────────
+
+model Tenant {
+  id        String  @id @default(uuid())
+  name      String
+  slug      String  @unique
+  currency  String  @default("GHS")
+  timezone  String  @default("Africa/Accra")
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  farms                Farm[]
+  customRoles          CustomRole[]
+  users                User[]
+  customers            Customer[]
+  notifications        Notification[]
+  notificationSettings NotificationSetting[]
+}
+
+// ─────────────────────────────────────────
+// Farm
+// ─────────────────────────────────────────
+
+model Farm {
+  id        String  @id @default(uuid())
+  tenant_id String
+  name      String
+  location  String?
+  notes     String?
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  flocks               Flock[]
+  eggProductions       EggProduction[]
+  sales                Sale[]
+  expenses             Expense[]
+  inventoryItems       InventoryItem[]
+  inventoryMovements   InventoryMovement[]
+  purchases            Purchase[]
+  userFarmAccesses     UserFarmAccess[]
+  notifications        Notification[]
+  notificationSettings NotificationSetting[]
+
+  @@index([tenant_id])
+}
+
+// ─────────────────────────────────────────
+// Custom Role
+// ─────────────────────────────────────────
+
+model CustomRole {
+  id          String  @id @default(uuid())
+  tenant_id   String
+  name        String
+  description String?
+  permissions Json    // String[] — e.g. ["flocks:view", "sales:create"]
+  is_system   Boolean @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  users  User[]
+
+  @@index([tenant_id])
+}
+
+// ─────────────────────────────────────────
+// User
+// ─────────────────────────────────────────
+
+model User {
+  id              String       @id @default(uuid())
+  tenant_id       String
+  name            String
+  email           String
+  password_hash   String
+  role_id         String
+  is_tenant_admin Boolean      @default(false)
+  is_active       Boolean      @default(true)
+  invite_status   InviteStatus @default(PENDING)
+  invited_by      String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  role          CustomRole     @relation(fields: [role_id], references: [id])
+  invitedByUser User?          @relation("UserInvites", fields: [invited_by], references: [id])
+  invitedUsers  User[]         @relation("UserInvites")
+  farmAccesses  UserFarmAccess[]
+  notifications Notification[]
+
+  // Audit trail relations
+  eggProductionsCreated     EggProduction[]     @relation("EggProductionCreatedBy")
+  eggProductionsUpdated     EggProduction[]     @relation("EggProductionUpdatedBy")
+  eggProductionsDeleted     EggProduction[]     @relation("EggProductionDeletedBy")
+  salesCreated              Sale[]              @relation("SaleCreatedBy")
+  salesUpdated              Sale[]              @relation("SaleUpdatedBy")
+  salesDeleted              Sale[]              @relation("SaleDeletedBy")
+  expensesCreated           Expense[]           @relation("ExpenseCreatedBy")
+  expensesUpdated           Expense[]           @relation("ExpenseUpdatedBy")
+  expensesDeleted           Expense[]           @relation("ExpenseDeletedBy")
+  purchasesCreated          Purchase[]          @relation("PurchaseCreatedBy")
+  purchasesUpdated          Purchase[]          @relation("PurchaseUpdatedBy")
+  purchasesDeleted          Purchase[]          @relation("PurchaseDeletedBy")
+  inventoryMovementsCreated InventoryMovement[] @relation("InventoryMovementCreatedBy")
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+}
+
+// ─────────────────────────────────────────
+// User Farm Access
+// ─────────────────────────────────────────
+
+model UserFarmAccess {
+  id      String @id @default(uuid())
+  user_id String
+  farm_id String
+
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  farm Farm @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, farm_id])
+  @@index([user_id])
+  @@index([farm_id])
+}
+
+// ─────────────────────────────────────────
+// Flock
+// ─────────────────────────────────────────
+
+model Flock {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  farm_id    String
+  name       String
+  start_date DateTime @db.Date
+  bird_count Int
+  notes      String?
+  is_active  Boolean  @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  farm           Farm            @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  eggProductions EggProduction[]
+  expenses       Expense[]
+
+  @@index([tenant_id, farm_id])
+}
+
+// ─────────────────────────────────────────
+// Egg Production
+// ─────────────────────────────────────────
+
+model EggProduction {
+  id                 String    @id @default(uuid())
+  tenant_id          String
+  farm_id            String
+  flock_id           String
+  date               DateTime  @db.Date
+  eggs_count         Int
+  session            Session?
+  original_record_id String?
+  correction_reason  String?
+  is_deleted         Boolean   @default(false)
+  synced_at          DateTime?
+
+  created_by    String
+  created_at    DateTime  @default(now())
+  updated_by    String?
+  updated_at    DateTime?
+  deleted_by    String?
+  deleted_at    DateTime?
+  delete_reason String?
+
+  farm          Farm   @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  flock         Flock  @relation(fields: [flock_id], references: [id])
+  createdByUser User   @relation("EggProductionCreatedBy", fields: [created_by], references: [id])
+  updatedByUser User?  @relation("EggProductionUpdatedBy", fields: [updated_by], references: [id])
+  deletedByUser User?  @relation("EggProductionDeletedBy", fields: [deleted_by], references: [id])
+
+  @@index([tenant_id, farm_id])
+  @@index([tenant_id, farm_id, date])
+}
+
+// ─────────────────────────────────────────
+// Customer (tenant-scoped, shared across farms)
+// ─────────────────────────────────────────
+
+model Customer {
+  id        String  @id @default(uuid())
+  tenant_id String
+  name      String
+  phone     String?
+  email     String?
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  sales  Sale[]
+
+  @@index([tenant_id])
+}
+
+// ─────────────────────────────────────────
+// Sale
+// ─────────────────────────────────────────
+
+model Sale {
+  id                 String        @id @default(uuid())
+  tenant_id          String
+  farm_id            String
+  customer_id        String
+  date               DateTime      @db.Date
+  crates_sold        Int
+  price_per_crate    Decimal       @db.Decimal(12, 2)
+  total_amount       Decimal       @db.Decimal(12, 2)
+  amount_paid        Decimal       @db.Decimal(12, 2)
+  balance            Decimal       @db.Decimal(12, 2)
+  payment_method     PaymentMethod
+  payment_reference  String?
+  original_record_id String?
+  correction_reason  String?
+  is_deleted         Boolean       @default(false)
+  synced_at          DateTime?
+
+  created_by    String
+  created_at    DateTime  @default(now())
+  updated_by    String?
+  updated_at    DateTime?
+  deleted_by    String?
+  deleted_at    DateTime?
+  delete_reason String?
+
+  farm          Farm     @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  customer      Customer @relation(fields: [customer_id], references: [id])
+  createdByUser User     @relation("SaleCreatedBy", fields: [created_by], references: [id])
+  updatedByUser User?    @relation("SaleUpdatedBy", fields: [updated_by], references: [id])
+  deletedByUser User?    @relation("SaleDeletedBy", fields: [deleted_by], references: [id])
+
+  @@index([tenant_id, farm_id])
+  @@index([tenant_id, farm_id, date])
+}
+
+// ─────────────────────────────────────────
+// Expense
+// ─────────────────────────────────────────
+
+model Expense {
+  id                 String          @id @default(uuid())
+  tenant_id          String
+  farm_id            String
+  date               DateTime        @db.Date
+  category           ExpenseCategory
+  category_group     CategoryGroup
+  description        String
+  amount             Decimal         @db.Decimal(12, 2)
+  flock_id           String?
+  original_record_id String?
+  correction_reason  String?
+  is_deleted         Boolean         @default(false)
+  synced_at          DateTime?
+
+  created_by    String
+  created_at    DateTime  @default(now())
+  updated_by    String?
+  updated_at    DateTime?
+  deleted_by    String?
+  deleted_at    DateTime?
+  delete_reason String?
+
+  farm          Farm   @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  flock         Flock? @relation(fields: [flock_id], references: [id])
+  createdByUser User   @relation("ExpenseCreatedBy", fields: [created_by], references: [id])
+  updatedByUser User?  @relation("ExpenseUpdatedBy", fields: [updated_by], references: [id])
+  deletedByUser User?  @relation("ExpenseDeletedBy", fields: [deleted_by], references: [id])
+
+  @@index([tenant_id, farm_id])
+  @@index([tenant_id, farm_id, date])
+  @@index([tenant_id, farm_id, category_group])
+}
+
+// ─────────────────────────────────────────
+// Inventory Item
+// ─────────────────────────────────────────
+
+model InventoryItem {
+  id                  String            @id @default(uuid())
+  tenant_id           String
+  farm_id             String
+  name                String
+  category            InventoryCategory
+  quantity_on_hand    Decimal           @db.Decimal(12, 3)
+  unit                String
+  low_stock_threshold Decimal?          @db.Decimal(12, 3)
+
+  updated_at DateTime @updatedAt
+
+  farm      Farm                @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  movements InventoryMovement[]
+  purchases Purchase[]
+
+  @@index([tenant_id, farm_id])
+}
+
+// ─────────────────────────────────────────
+// Inventory Movement (immutable log)
+// ─────────────────────────────────────────
+
+model InventoryMovement {
+  id              String       @id @default(uuid())
+  tenant_id       String
+  farm_id         String
+  item_id         String
+  type            MovementType
+  quantity_change Decimal      @db.Decimal(12, 3)
+  reason          String?
+  reference_id    String?
+
+  created_by String
+  created_at DateTime @default(now())
+
+  farm          Farm          @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  item          InventoryItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  createdByUser User          @relation("InventoryMovementCreatedBy", fields: [created_by], references: [id])
+
+  @@index([tenant_id, farm_id])
+  @@index([item_id])
+}
+
+// ─────────────────────────────────────────
+// Purchase
+// ─────────────────────────────────────────
+
+model Purchase {
+  id        String   @id @default(uuid())
+  tenant_id String
+  farm_id   String
+  item_id   String
+  date      DateTime @db.Date
+  quantity  Decimal  @db.Decimal(12, 3)
+  total_cost Decimal @db.Decimal(12, 2)
+  is_deleted Boolean  @default(false)
+  synced_at  DateTime?
+
+  created_by    String
+  created_at    DateTime  @default(now())
+  updated_by    String?
+  updated_at    DateTime?
+  deleted_by    String?
+  deleted_at    DateTime?
+  delete_reason String?
+
+  farm          Farm          @relation(fields: [farm_id], references: [id], onDelete: Cascade)
+  item          InventoryItem @relation(fields: [item_id], references: [id])
+  createdByUser User          @relation("PurchaseCreatedBy", fields: [created_by], references: [id])
+  updatedByUser User?         @relation("PurchaseUpdatedBy", fields: [updated_by], references: [id])
+  deletedByUser User?         @relation("PurchaseDeletedBy", fields: [deleted_by], references: [id])
+
+  @@index([tenant_id, farm_id])
+}
+
+// ─────────────────────────────────────────
+// Notification
+// ─────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  tenant_id String
+  farm_id   String?
+  user_id   String
+  type      NotificationType
+  title     String
+  message   String
+  is_read   Boolean          @default(false)
+
+  created_at DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  farm   Farm?   @relation(fields: [farm_id], references: [id], onDelete: SetNull)
+  user   User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, user_id])
+  @@index([user_id, is_read])
+}
+
+// ─────────────────────────────────────────
+// Notification Setting
+// ─────────────────────────────────────────
+
+model NotificationSetting {
+  id            String   @id @default(uuid())
+  tenant_id     String
+  farm_id       String?
+  setting_key   String
+  setting_value String
+  updated_by    String
+
+  updated_at DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  farm   Farm?  @relation(fields: [farm_id], references: [id], onDelete: SetNull)
+
+  @@unique([tenant_id, farm_id, setting_key])
+  @@index([tenant_id])
+}
